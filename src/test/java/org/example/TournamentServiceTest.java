@@ -9,12 +9,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,9 +36,8 @@ class TournamentServiceTest {
     void testAddPlayer_Success() throws DuplicatePlayerException {
         // Vérifie qu'un joueur valide est ajouté sans exception.
         when(playerRepository.findByNicknameIgnoreCase(anyString())).thenReturn(Optional.empty());
-        when(playerRepository.save(any(Player.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doNothing().when(playerRepository).save(any(Player.class));
 
-        when(playerRepository.findAll()).thenReturn(List.of());
         String uniqueNick = "Player_" + System.currentTimeMillis();
 
         service.addPlayer(uniqueNick, 10);
