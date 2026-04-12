@@ -5,6 +5,8 @@ import org.example.exceptions.InvalidMatchException;
 import org.example.models.Player;
 import org.example.repositories.MatchRepository;
 import org.example.repositories.PlayerRepository;
+import org.example.web.dto.ActionResponseDTO;
+import org.example.web.dto.TotalScoreDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -14,7 +16,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 /**
@@ -33,16 +34,15 @@ class TournamentServiceTest {
     }
 
     @Test
-    void testAddPlayer_Success() throws DuplicatePlayerException {
+    void testAddPlayer_Success() {
         // Vérifie qu'un joueur valide est ajouté sans exception.
         when(playerRepository.findByNicknameIgnoreCase(anyString())).thenReturn(Optional.empty());
-        doNothing().when(playerRepository).save(any(Player.class));
+        when(playerRepository.save(any(Player.class))).thenReturn(new Player(1, "saved", 10, 0));
 
         String uniqueNick = "Player_" + System.currentTimeMillis();
 
-        service.addPlayer(uniqueNick, 10);
-
-        assertTrue(true);
+        ActionResponseDTO response = service.addPlayer(uniqueNick, 10);
+        assertEquals(1, response.resourceId());
     }
 
     @Test
@@ -82,8 +82,8 @@ class TournamentServiceTest {
     void testCalculateTotalTournamentScore() {
         // Vérifie le calcul global des scores.
         when(playerRepository.sumAllScores()).thenReturn(42);
-        int totalScore = service.calculateTotalTournamentScore();
+        TotalScoreDTO totalScore = service.calculateTotalTournamentScore();
 
-        assertEquals(42, totalScore);
+        assertEquals(42, totalScore.totalScore());
     }
 }

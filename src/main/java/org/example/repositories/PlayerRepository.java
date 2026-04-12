@@ -12,7 +12,7 @@ public interface PlayerRepository {
 
     Optional<Player> findByNicknameIgnoreCase(String nickname);
 
-    void save(Player player);
+    Player save(Player player);
 
     List<Player> findTop3ByScoreDesc();
 

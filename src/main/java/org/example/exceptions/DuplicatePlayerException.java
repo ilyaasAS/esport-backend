@@ -1,7 +1,7 @@
 package org.example.exceptions;
 
-public class DuplicatePlayerException extends Exception {
+public class DuplicatePlayerException extends BusinessException {
     public DuplicatePlayerException(String message) {
-        super(message);
+        super("DUPLICATE_PLAYER", message);
     }
 }
