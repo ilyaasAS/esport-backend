@@ -39,14 +39,14 @@ public class TournamentService {
     }
 
     /**
-     * Creates a new player in the tournament.
+     * Crée un nouveau joueur dans le tournoi.
      * <p>
-     * This method validates the nickname, checks that no existing player already uses it, and persists
-     * the new player with an initial score of {@code 0}.
+     * Cette méthode valide le pseudo, vérifie qu'aucun joueur existant ne l'utilise déjà,
+     * puis persiste le joueur avec un score initial à {@code 0}.
      *
-     * @param nickname the unique nickname used to identify the player in the tournament
-     * @param level the starting skill level of the player, must be greater than or equal to {@code 0}
-     * @return a structured action response containing the created player id, a success message, and a timestamp
+     * @param nickname pseudo unique utilisé pour identifier le joueur dans le tournoi
+     * @param level niveau initial du joueur, doit être supérieur ou égal à {@code 0}
+     * @return réponse d'action structurée contenant l'identifiant créé, un message de succès et un horodatage
      */
     @Transactional
     public ActionResponseDTO addPlayer(String nickname, int level) {
@@ -68,16 +68,16 @@ public class TournamentService {
     }
 
     /**
-     * Records a new match between two different players and updates their scores.
+     * Enregistre un nouveau match entre deux joueurs distincts et met à jour leurs scores.
      * <p>
-     * The method validates player ids and score values, loads the involved players, updates their cumulative
-     * score, then persists both the player updates and the newly created match.
+     * La méthode valide les identifiants joueurs et les valeurs de score, charge les joueurs concernés,
+     * met à jour leur score cumulé, puis persiste à la fois les joueurs et le nouveau match.
      *
-     * @param p1Id the id of the first player
-     * @param p2Id the id of the second player, must be different from {@code p1Id}
-     * @param score1 the score obtained by player 1, must be greater than or equal to {@code 0}
-     * @param score2 the score obtained by player 2, must be greater than or equal to {@code 0}
-     * @return a structured action response containing the created match id, a success message, and a timestamp
+     * @param p1Id identifiant du premier joueur
+     * @param p2Id identifiant du second joueur, doit être différent de {@code p1Id}
+     * @param score1 score obtenu par le joueur 1, doit être supérieur ou égal à {@code 0}
+     * @param score2 score obtenu par le joueur 2, doit être supérieur ou égal à {@code 0}
+     * @return réponse d'action structurée contenant l'identifiant du match créé, un message de succès et un horodatage
      */
     @Transactional
     public ActionResponseDTO createMatch(int p1Id, int p2Id, int score1, int score2) {
@@ -109,36 +109,36 @@ public class TournamentService {
     }
 
     /**
-     * Returns all registered players as DTOs.
+     * Retourne tous les joueurs enregistrés sous forme de DTO.
      *
-     * @return the complete list of players with id, nickname, level, and score
+     * @return liste complète des joueurs avec identifiant, pseudo, niveau et score
      */
     public List<PlayerDTO> getPlayers() {
         return playerRepository.findAll().stream().map(this::toPlayerDTO).toList();
     }
 
     /**
-     * Returns all recorded matches as DTOs.
+     * Retourne tous les matchs enregistrés sous forme de DTO.
      *
-     * @return the complete list of matches with player identity, scores, and match date
+     * @return liste complète des matchs avec identité des joueurs, scores et date de rencontre
      */
     public List<MatchDTO> getMatches() {
         return matchRepository.findAll().stream().map(this::toMatchDTO).toList();
     }
 
     /**
-     * Returns the top three players ordered by descending score.
+     * Retourne les trois meilleurs joueurs classés par score décroissant.
      *
-     * @return a list of at most three player DTOs sorted by ranking score
+     * @return liste d'au plus trois joueurs triés selon leur rang
      */
     public List<PlayerDTO> getTop3Players() {
         return playerRepository.findTop3ByScoreDesc().stream().map(this::toPlayerDTO).toList();
     }
 
     /**
-     * Computes the total score accumulated by all players in the tournament.
+     * Calcule le score total cumulé par tous les joueurs du tournoi.
      *
-     * @return a DTO containing the aggregate tournament score
+     * @return DTO contenant le score agrégé du tournoi
      */
     public TotalScoreDTO calculateTotalTournamentScore() {
         return new TotalScoreDTO(playerRepository.sumAllScores());

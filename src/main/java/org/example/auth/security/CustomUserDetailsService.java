@@ -14,6 +14,9 @@ import java.util.Collection;
 import java.util.List;
 
 @Service
+/**
+ * Adaptateur Spring Security chargé de charger un utilisateur applicatif en {@link UserDetails}.
+ */
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
@@ -23,6 +26,13 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     @Override
+    /**
+     * Charge un utilisateur par son nom pour l'authentification Spring Security.
+     *
+     * @param username identifiant utilisateur recherché
+     * @return représentation {@link UserDetails} utilisable par Spring Security
+     * @throws UsernameNotFoundException si l'utilisateur n'existe pas
+     */
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         UserEntity user = userRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Utilisateur introuvable."));

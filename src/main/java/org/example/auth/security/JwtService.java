@@ -15,6 +15,9 @@ import java.util.Map;
 import java.util.function.Function;
 
 @Service
+/**
+ * Service technique de génération et de validation des jetons JWT.
+ */
 public class JwtService {
 
     private final JwtProperties jwtProperties;
@@ -23,6 +26,12 @@ public class JwtService {
         this.jwtProperties = jwtProperties;
     }
 
+    /**
+     * Génère un jeton JWT signé pour un utilisateur authentifié.
+     *
+     * @param user utilisateur authentifié
+     * @return jeton JWT signé
+     */
     public String generateToken(UserEntity user) {
         Instant now = Instant.now();
         Instant expiration = now.plusMillis(jwtProperties.getExpirationMs());
@@ -36,10 +45,23 @@ public class JwtService {
                 .compact();
     }
 
+    /**
+     * Extrait le nom d'utilisateur contenu dans le jeton.
+     *
+     * @param token jeton JWT brut
+     * @return nom d'utilisateur porté par le jeton
+     */
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
 
+    /**
+     * Vérifie la validité fonctionnelle d'un jeton pour un utilisateur attendu.
+     *
+     * @param token jeton JWT brut
+     * @param expectedUsername nom d'utilisateur attendu
+     * @return {@code true} si le jeton est valide et non expiré pour cet utilisateur
+     */
     public boolean isTokenValid(String token, String expectedUsername) {
         String username = extractUsername(token);
         return username.equalsIgnoreCase(expectedUsername) && !isTokenExpired(token);

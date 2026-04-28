@@ -17,6 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+/**
+ * Service applicatif d'authentification.
+ * <p>
+ * Il gère l'inscription, l'authentification et l'émission des jetons JWT.
+ */
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -36,6 +41,13 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
+    /**
+     * Inscrit un nouvel utilisateur avec le rôle {@code USER}.
+     *
+     * @param request charge utile d'inscription validée
+     * @return réponse d'authentification contenant le jeton JWT et les informations utilisateur
+     * @throws UserAlreadyExistsException si le nom d'utilisateur est déjà utilisé
+     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsernameIgnoreCase(request.username())) {
@@ -53,6 +65,13 @@ public class AuthService {
         return buildResponse(savedUser, token);
     }
 
+    /**
+     * Authentifie un utilisateur existant et génère un nouveau jeton JWT.
+     *
+     * @param request charge utile de connexion
+     * @return réponse d'authentification contenant le jeton JWT et les informations utilisateur
+     * @throws InvalidCredentialsException si l'identifiant ou le mot de passe est invalide
+     */
     public AuthResponse login(LoginRequest request) {
         try {
             authenticationManager.authenticate(

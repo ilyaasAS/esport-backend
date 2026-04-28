@@ -33,7 +33,7 @@ public final class MatchMapper {
         }
         Player player1 = PlayerMapper.toDomain(entity.getPlayer1());
         Player player2 = PlayerMapper.toDomain(entity.getPlayer2());
-        // Domain constructor enforces all invariants.
+        // Le constructeur du domaine applique toutes les invariantes métier.
         return new Match(
                 entity.getId(),
                 player1,

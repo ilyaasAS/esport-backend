@@ -21,10 +21,20 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice
+/**
+ * Gestionnaire global des exceptions REST avec format de réponse unifié.
+ */
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * Traite les exceptions métier et mappe un statut HTTP cohérent.
+     *
+     * @param ex exception métier levée
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
         log.error("Erreur [BUSINESS] sur {}: {}", request.getRequestURI(), ex.getMessage());
@@ -32,6 +42,13 @@ public class GlobalExceptionHandler {
         return buildResponse(status, ex.getErrorCode(), ex.getMessage(), request.getRequestURI(), null);
     }
 
+    /**
+     * Traite les erreurs de validation des DTO de requête.
+     *
+     * @param ex exception de validation Spring
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée avec détails de champs
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(
             MethodArgumentNotValidException ex,
@@ -51,6 +68,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    /**
+     * Traite le cas d'un utilisateur déjà existant à l'inscription.
+     *
+     * @param ex exception fonctionnelle levée
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(UserAlreadyExistsException.class)
     public ResponseEntity<Map<String, Object>> handleUserAlreadyExists(
             UserAlreadyExistsException ex,
@@ -60,6 +84,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, "USER_ALREADY_EXISTS", ex.getMessage(), request.getRequestURI(), null);
     }
 
+    /**
+     * Traite les erreurs d'identifiants invalides.
+     *
+     * @param ex exception d'authentification levée
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidCredentials(
             InvalidCredentialsException ex,
@@ -69,6 +100,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", ex.getMessage(), request.getRequestURI(), null);
     }
 
+    /**
+     * Traite les violations d'intégrité des données en persistence.
+     *
+     * @param ex exception d'intégrité levée par la couche data
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
             DataIntegrityViolationException ex,
@@ -84,6 +122,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    /**
+     * Traite les cas d'entité absente côté persistence.
+     *
+     * @param ex exception d'entité introuvable
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(PersistenceEntityNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handlePersistenceEntityNotFound(
             PersistenceEntityNotFoundException ex,
@@ -93,6 +138,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, "PERSISTENCE_ENTITY_NOT_FOUND", ex.getMessage(), request.getRequestURI(), null);
     }
 
+    /**
+     * Traite les erreurs techniques d'accès aux données.
+     *
+     * @param ex exception d'accès persistence
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(PersistenceAccessException.class)
     public ResponseEntity<Map<String, Object>> handlePersistenceAccessException(
             PersistenceAccessException ex,
@@ -108,6 +160,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    /**
+     * Traite toute exception non prévue.
+     *
+     * @param ex exception non catégorisée
+     * @param request requête HTTP en cours
+     * @return réponse JSON normalisée
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnhandledException(
             Exception ex,

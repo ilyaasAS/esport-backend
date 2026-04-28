@@ -36,7 +36,7 @@ public class MatchPersistenceAdapter implements MatchRepository {
                     .map(MatchMapper::toDomain)
                     .toList();
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error loading matches from MySQL.", e);
+            throw new PersistenceAccessException("Erreur lors du chargement des matchs depuis MySQL.", e);
         }
     }
 
@@ -45,11 +45,11 @@ public class MatchPersistenceAdapter implements MatchRepository {
         try {
             PlayerEntity player1Entity = springDataPlayerRepository.findById(match.getPlayer1().getId())
                     .orElseThrow(() -> new PersistenceEntityNotFoundException(
-                            "Player 1 not found in MySQL: " + match.getPlayer1().getId()
+                            "Joueur 1 introuvable dans MySQL : " + match.getPlayer1().getId()
                     ));
             PlayerEntity player2Entity = springDataPlayerRepository.findById(match.getPlayer2().getId())
                     .orElseThrow(() -> new PersistenceEntityNotFoundException(
-                            "Player 2 not found in MySQL: " + match.getPlayer2().getId()
+                            "Joueur 2 introuvable dans MySQL : " + match.getPlayer2().getId()
                     ));
 
             MatchEntity entity = MatchMapper.toEntity(match);
@@ -58,7 +58,7 @@ public class MatchPersistenceAdapter implements MatchRepository {
             MatchEntity savedEntity = springDataMatchRepository.save(entity);
             return MatchMapper.toDomain(savedEntity);
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error saving match to MySQL.", e);
+            throw new PersistenceAccessException("Erreur lors de l'enregistrement du match dans MySQL.", e);
         }
     }
 }

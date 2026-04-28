@@ -16,6 +16,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
+/**
+ * Filtre JWT exécuté une fois par requête pour peupler le contexte de sécurité Spring.
+ */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
@@ -29,6 +32,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
+    /**
+     * Extrait le jeton Bearer, valide son contenu, puis injecte l'authentification dans le contexte.
+     *
+     * @param request requête HTTP entrante
+     * @param response réponse HTTP en cours
+     * @param filterChain chaîne des filtres Spring Security
+     * @throws ServletException en cas d'erreur servlet
+     * @throws IOException en cas d'erreur d'entrée/sortie
+     */
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,

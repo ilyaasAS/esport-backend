@@ -15,6 +15,9 @@ import java.io.IOException;
 import java.util.Map;
 
 @Component
+/**
+ * Gestionnaire JSON des refus d'accès (HTTP 403) pour les requêtes authentifiées sans droits suffisants.
+ */
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper;
@@ -24,6 +27,15 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
     }
 
     @Override
+    /**
+     * Retourne une réponse JSON standardisée lorsque l'accès est interdit.
+     *
+     * @param request requête HTTP d'origine
+     * @param response réponse HTTP à écrire
+     * @param accessDeniedException exception de refus d'accès
+     * @throws IOException en cas d'erreur d'entrée/sortie
+     * @throws ServletException en cas d'erreur servlet
+     */
     public void handle(
             HttpServletRequest request,
             HttpServletResponse response,

@@ -20,6 +20,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api")
+/**
+ * Contrôleur REST des opérations de tournoi (joueurs, matchs et statistiques).
+ */
 public class TournamentController {
 
     private final TournamentService tournamentService;
@@ -28,17 +31,34 @@ public class TournamentController {
         this.tournamentService = tournamentService;
     }
 
+    /**
+     * Crée un nouveau joueur.
+     *
+     * @param request données de création joueur validées
+     * @return réponse HTTP 201 avec le résultat de création
+     */
     @PostMapping("/players")
     public ResponseEntity<ActionResponseDTO> addPlayer(@Valid @RequestBody CreatePlayerRequest request) {
         ActionResponseDTO response = tournamentService.addPlayer(request.nickname(), request.level());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     * Retourne la liste complète des joueurs.
+     *
+     * @return réponse HTTP 200 contenant les joueurs
+     */
     @GetMapping("/players")
     public ResponseEntity<List<PlayerDTO>> getPlayers() {
         return ResponseEntity.ok(tournamentService.getPlayers());
     }
 
+    /**
+     * Enregistre un match entre deux joueurs.
+     *
+     * @param request données de création match validées
+     * @return réponse HTTP 201 avec le résultat de création
+     */
     @PostMapping("/matches")
     public ResponseEntity<ActionResponseDTO> createMatch(@Valid @RequestBody CreateMatchRequest request) {
         ActionResponseDTO response = tournamentService.createMatch(
@@ -50,16 +70,31 @@ public class TournamentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     * Retourne la liste complète des matchs.
+     *
+     * @return réponse HTTP 200 contenant les matchs
+     */
     @GetMapping("/matches")
     public ResponseEntity<List<MatchDTO>> getMatches() {
         return ResponseEntity.ok(tournamentService.getMatches());
     }
 
+    /**
+     * Retourne les trois meilleurs joueurs selon leur score.
+     *
+     * @return réponse HTTP 200 contenant le top 3
+     */
     @GetMapping("/stats/top-3")
     public ResponseEntity<List<PlayerDTO>> getTop3Players() {
         return ResponseEntity.ok(tournamentService.getTop3Players());
     }
 
+    /**
+     * Retourne le score total cumulé du tournoi.
+     *
+     * @return réponse HTTP 200 contenant le score agrégé
+     */
     @GetMapping("/stats/total-score")
     public ResponseEntity<TotalScoreDTO> getTotalScore() {
         return ResponseEntity.ok(tournamentService.calculateTotalTournamentScore());

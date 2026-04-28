@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+/**
+ * Contrôleur REST dédié aux opérations d'authentification.
+ */
 public class AuthController {
 
     private final AuthService authService;
@@ -22,11 +25,23 @@ public class AuthController {
         this.authService = authService;
     }
 
+    /**
+     * Crée un nouveau compte utilisateur.
+     *
+     * @param request données d'inscription validées
+     * @return réponse HTTP 201 contenant le jeton d'authentification
+     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
+    /**
+     * Authentifie un utilisateur existant.
+     *
+     * @param request identifiants de connexion validés
+     * @return réponse HTTP 200 contenant le jeton d'authentification
+     */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));

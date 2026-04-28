@@ -15,6 +15,9 @@ import java.io.IOException;
 import java.util.Map;
 
 @Component
+/**
+ * Point d'entrée JSON pour les accès non authentifiés (HTTP 401).
+ */
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;
@@ -24,6 +27,15 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
     }
 
     @Override
+    /**
+     * Retourne une réponse JSON standardisée lorsque l'authentification est requise.
+     *
+     * @param request requête HTTP d'origine
+     * @param response réponse HTTP à écrire
+     * @param authException exception d'authentification déclenchée
+     * @throws IOException en cas d'erreur d'entrée/sortie
+     * @throws ServletException en cas d'erreur servlet
+     */
     public void commence(
             HttpServletRequest request,
             HttpServletResponse response,

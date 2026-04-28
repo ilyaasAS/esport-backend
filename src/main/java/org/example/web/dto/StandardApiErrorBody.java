@@ -7,14 +7,24 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Builds the canonical JSON error body used by {@link org.example.web.advice.GlobalExceptionHandler}
- * and security entry points so all API error responses share the same schema.
+ * Construit le corps JSON d'erreur canonique utilisé par {@link org.example.web.advice.GlobalExceptionHandler}
+ * et par les points d'entrée de sécurité afin que toutes les réponses d'erreur API partagent le même schéma.
  */
 public final class StandardApiErrorBody {
 
     private StandardApiErrorBody() {
     }
 
+    /**
+     * Produit une représentation normalisée d'une erreur API.
+     *
+     * @param status statut HTTP à exposer
+     * @param errorCode code fonctionnel ou technique de l'erreur
+     * @param message message explicite destiné au client
+     * @param path chemin de la requête ayant échoué
+     * @param details détails complémentaires optionnels, généralement issus de la validation
+     * @return map ordonnée représentant le corps JSON standardisé
+     */
     public static Map<String, Object> toMap(
             HttpStatus status,
             String errorCode,

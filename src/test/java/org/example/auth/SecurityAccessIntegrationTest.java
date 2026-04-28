@@ -45,7 +45,7 @@ class SecurityAccessIntegrationTest {
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
-    void getPlayers_est_public() throws Exception {
+    void shouldAllowPublicAccessToGetPlayers() throws Exception {
         when(tournamentService.getPlayers()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/players"))
@@ -53,7 +53,7 @@ class SecurityAccessIntegrationTest {
     }
 
     @Test
-    void postPlayers_sans_auth_est_refuse() throws Exception {
+    void shouldRejectCreatePlayerWithoutAuthentication() throws Exception {
         mockMvc.perform(post("/api/players")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -67,7 +67,7 @@ class SecurityAccessIntegrationTest {
 
     @Test
     @WithMockUser(roles = "USER")
-    void postPlayers_avec_user_est_autorise() throws Exception {
+    void shouldAllowCreatePlayerForUserRole() throws Exception {
         doNothing().when(tournamentService).addPlayer("Ninja", 18);
 
         mockMvc.perform(post("/api/players")
@@ -83,7 +83,7 @@ class SecurityAccessIntegrationTest {
 
     @Test
     @WithMockUser(roles = "USER")
-    void postMatches_avec_user_est_interdit() throws Exception {
+    void shouldForbidCreateMatchForUserRole() throws Exception {
         mockMvc.perform(post("/api/matches")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -99,7 +99,7 @@ class SecurityAccessIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void postMatches_avec_admin_est_autorise() throws Exception {
+    void shouldAllowCreateMatchForAdminRole() throws Exception {
         doNothing().when(tournamentService).createMatch(1, 2, 10, 8);
 
         mockMvc.perform(post("/api/matches")

@@ -20,7 +20,7 @@ public final class PlayerMapper {
         if (entity == null) {
             return null;
         }
-        // Domain constructor enforces all invariants.
+        // Le constructeur du domaine applique toutes les invariantes métier.
         return new Player(entity.getId(), entity.getNickname(), entity.getLevel(), entity.getScore());
     }
 }

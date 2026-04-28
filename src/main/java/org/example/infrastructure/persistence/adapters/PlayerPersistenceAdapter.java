@@ -29,7 +29,7 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
                     .map(PlayerMapper::toDomain)
                     .toList();
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error loading players from MySQL.", e);
+            throw new PersistenceAccessException("Erreur lors du chargement des joueurs depuis MySQL.", e);
         }
     }
 
@@ -38,7 +38,7 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         try {
             return springDataPlayerRepository.findById(id).map(PlayerMapper::toDomain);
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error loading player by id from MySQL: " + id, e);
+            throw new PersistenceAccessException("Erreur lors du chargement du joueur par identifiant depuis MySQL : " + id, e);
         }
     }
 
@@ -47,7 +47,7 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         try {
             return springDataPlayerRepository.findByNicknameIgnoreCase(nickname).map(PlayerMapper::toDomain);
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error loading player by nickname from MySQL: " + nickname, e);
+            throw new PersistenceAccessException("Erreur lors du chargement du joueur par pseudo depuis MySQL : " + nickname, e);
         }
     }
 
@@ -58,7 +58,7 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
             PlayerEntity savedEntity = springDataPlayerRepository.save(playerEntity);
             return PlayerMapper.toDomain(savedEntity);
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error saving player to MySQL.", e);
+            throw new PersistenceAccessException("Erreur lors de l'enregistrement du joueur dans MySQL.", e);
         }
     }
 
@@ -70,7 +70,7 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
                     .map(PlayerMapper::toDomain)
                     .toList();
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error loading top 3 players from MySQL.", e);
+            throw new PersistenceAccessException("Erreur lors du chargement du top 3 des joueurs depuis MySQL.", e);
         }
     }
 
@@ -79,7 +79,7 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         try {
             return springDataPlayerRepository.sumAllScores();
         } catch (DataAccessException e) {
-            throw new PersistenceAccessException("Error computing total score from MySQL.", e);
+            throw new PersistenceAccessException("Erreur lors du calcul du score total depuis MySQL.", e);
         }
     }
 }
