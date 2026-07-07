@@ -3,6 +3,14 @@ package org.example.web.dto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
+/**
+ * Décrit la charge utile de création d'un match entre deux joueurs.
+ *
+ * @param player1Id identifiant du premier joueur, strictement positif
+ * @param player2Id identifiant du second joueur, strictement positif
+ * @param score1 score du premier joueur, supérieur ou égal à 0
+ * @param score2 score du second joueur, supérieur ou égal à 0
+ */
 public record CreateMatchRequest(
         @NotNull(message = "L'identifiant du joueur 1 est obligatoire.")
         @Min(value = 1, message = "L'identifiant du joueur 1 doit être supérieur ou égal à 1.")

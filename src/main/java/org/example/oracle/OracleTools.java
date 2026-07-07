@@ -1,12 +1,13 @@
 package org.example.oracle;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.example.exceptions.BusinessException;
 import org.example.exceptions.PlayerNotFoundException;
 import org.example.models.Player;
-import org.example.repositories.PlayerRepository;
-import org.example.services.TournamentService;
+import org.example.services.LeagueService;
 import org.example.web.dto.MatchDTO;
 import org.example.web.dto.PlayerDTO;
 import org.springframework.stereotype.Component;
@@ -16,14 +17,23 @@ import java.util.Comparator;
 import java.util.List;
 
 @Component
+/**
+ * Fournisseur des fonctions exposées au mécanisme d'appel d'outils du modèle Oracle.
+ * <p>
+ * Cette façade outille le modèle avec des opérations métier strictement contrôlées
+ * (lecture, création et pronostic) en s'appuyant sur le service applicatif de ligue.
+ */
 public class OracleTools {
 
-    private final TournamentService tournamentService;
-    private final PlayerRepository playerRepository;
+    private final LeagueService leagueService;
 
-    public OracleTools(TournamentService tournamentService, PlayerRepository playerRepository) {
-        this.tournamentService = tournamentService;
-        this.playerRepository = playerRepository;
+    /**
+     * Construit le fournisseur d'outils Oracle avec ses dépendances métier.
+     *
+     * @param leagueService service applicatif de ligue injecté pour exécuter les opérations métier
+     */
+    public OracleTools(LeagueService leagueService) {
+        this.leagueService = leagueService;
     }
 
     /**
@@ -33,7 +43,7 @@ public class OracleTools {
      * @return la liste des joueurs disponibles
      */
     public List<PlayerDTO> getPlayers(ReadPlayersToolRequest ignored) {
-        return tournamentService.getPlayers();
+        return leagueService.getPlayers();
     }
 
     /**
@@ -44,7 +54,7 @@ public class OracleTools {
      */
     public List<PlayerDTO> getPlayersRanking(ReadPlayersRankingRequest request) {
         int limit = sanitizeLimit(request.limit());
-        return tournamentService.getPlayers().stream()
+        return leagueService.getPlayers().stream()
                 .sorted(Comparator.comparingInt(PlayerDTO::score).reversed())
                 .limit(limit)
                 .toList();
@@ -57,7 +67,7 @@ public class OracleTools {
      * @return la liste des matchs disponibles
      */
     public List<MatchDTO> getMatches(ReadMatchesToolRequest ignored) {
-        return tournamentService.getMatches();
+        return leagueService.getMatches();
     }
 
     /**
@@ -68,8 +78,8 @@ public class OracleTools {
      */
     public List<MatchDTO> getMatchesRanking(ReadMatchesRankingRequest request) {
         int limit = sanitizeLimit(request.limit());
-        return tournamentService.getMatches().stream()
-                .sorted(Comparator.comparingInt(this::matchSpectacleScore).reversed())
+        return leagueService.getMatches().stream()
+                .sorted(Comparator.comparingInt(this::matchIntensityScore).reversed())
                 .limit(limit)
                 .toList();
     }
@@ -83,7 +93,7 @@ public class OracleTools {
      */
     public String addPlayer(AddPlayerToolRequest request) {
         String nickname = requireStrictText(request.nickname(), "nickname");
-        return toNaturalSentence(tournamentService.addPlayer(nickname, request.level()).message());
+        return toNaturalSentence(leagueService.addPlayer(nickname, request.level()).message());
     }
 
     /**
@@ -99,16 +109,10 @@ public class OracleTools {
         String player1Nickname = requireStrictText(request.player1Nickname(), "player1Nickname");
         String player2Nickname = requireStrictText(request.player2Nickname(), "player2Nickname");
 
-        int player1Id = playerRepository.findByNicknameIgnoreCase(player1Nickname)
-                .orElseThrow(() -> new PlayerNotFoundException(
-                        "ERREUR MÉTIER : Le joueur [" + player1Nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."))
-                .getId();
-        int player2Id = playerRepository.findByNicknameIgnoreCase(player2Nickname)
-                .orElseThrow(() -> new PlayerNotFoundException(
-                        "ERREUR MÉTIER : Le joueur [" + player2Nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."))
-                .getId();
+        int player1Id = leagueService.getPlayerIdByNickname(player1Nickname);
+        int player2Id = leagueService.getPlayerIdByNickname(player2Nickname);
 
-        return toNaturalSentence(tournamentService.createMatch(player1Id, player2Id, request.score1(), request.score2()).message());
+        return toNaturalSentence(leagueService.createMatch(player1Id, player2Id, request.score1(), request.score2()).message());
     }
 
     /**
@@ -123,12 +127,8 @@ public class OracleTools {
         String player1Nickname = requireStrictText(request.player1Nickname(), "player1Nickname");
         String player2Nickname = requireStrictText(request.player2Nickname(), "player2Nickname");
 
-        Player player1 = playerRepository.findByNicknameIgnoreCase(player1Nickname)
-                .orElseThrow(() -> new PlayerNotFoundException(
-                        "ERREUR MÉTIER : Le joueur [" + player1Nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."));
-        Player player2 = playerRepository.findByNicknameIgnoreCase(player2Nickname)
-                .orElseThrow(() -> new PlayerNotFoundException(
-                        "ERREUR MÉTIER : Le joueur [" + player2Nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."));
+        Player player1 = leagueService.getPlayerByNickname(player1Nickname);
+        Player player2 = leagueService.getPlayerByNickname(player2Nickname);
 
         double force1 = computePowerScore(player1.getLevel(), player1.getScore());
         double force2 = computePowerScore(player2.getLevel(), player2.getScore());
@@ -157,7 +157,7 @@ public class OracleTools {
     private String requireStrictText(String value, String fieldName) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.isEmpty()) {
-            throw new BusinessException("INVALID_TOOL_INPUT", "Le champ '" + fieldName + "' ne doit pas etre vide.");
+            throw new BusinessException("INVALID_TOOL_INPUT", "Le champ '" + fieldName + "' ne doit pas être vide.");
         }
         return normalized;
     }
@@ -195,13 +195,13 @@ public class OracleTools {
      * @param matchDTO match évalué
      * @return somme des points des deux joueurs
      */
-    private int matchSpectacleScore(MatchDTO matchDTO) {
+    private int matchIntensityScore(MatchDTO matchDTO) {
         return matchDTO.scorePlayer1() + matchDTO.scorePlayer2();
     }
 
     /**
-     * Calcule la force d'un joueur selon la formule:
-     * Force = (niveau * 0.6) + (score * 0.4)
+     * Calcule le score de puissance d'un joueur selon la formule :
+     * Score = (0.6 x niveau) + (0.4 x points)
      *
      * @param level niveau courant du joueur
      * @param score score cumulé du joueur
@@ -215,7 +215,7 @@ public class OracleTools {
     }
 
     public record ReadPlayersRankingRequest(
-            @JsonPropertyDescription("Nombre maximum d'elements du classement joueurs a retourner. Exemple: 5 pour un top 5. Defaut: 3.")
+            @JsonPropertyDescription("Nombre maximum d'éléments du classement joueurs à retourner. Exemple: 5 pour un top 5. Défaut: 3.")
             int limit
     ) {
     }
@@ -224,15 +224,17 @@ public class OracleTools {
     }
 
     public record ReadMatchesRankingRequest(
-            @JsonPropertyDescription("Nombre maximum d'elements du classement matchs a retourner. Exemple: 10 pour un top 10. Defaut: 3.")
+            @JsonPropertyDescription("Nombre maximum d'éléments du classement matchs à retourner. Exemple: 10 pour un top 10. Défaut: 3.")
             int limit
     ) {
     }
 
     public record AddPlayerToolRequest(
-            @JsonPropertyDescription("Pseudo du joueur en TEXTE BRUT uniquement (type string JSON). Interdiction absolue d'envoyer un objet JSON, tableau ou structure imbriquee. Exemple valide: \"shadow\".")
+            @JsonPropertyDescription("Pseudo du joueur en TEXTE BRUT uniquement (type string JSON). Interdiction absolue d'envoyer un objet JSON, tableau ou structure imbriquée. Exemple valide: \"shadow\".")
+            @NotBlank(message = "nickname est obligatoire.")
             String nickname,
             @JsonPropertyDescription("Niveau initial du joueur, entier >= 0.")
+            @Min(value = 0, message = "level doit être supérieur ou égal à 0.")
             int level
     ) {
     }
@@ -240,13 +242,17 @@ public class OracleTools {
     public record CreateMatchToolRequest(
             @JsonPropertyDescription("Pseudo du joueur 1 en TEXTE BRUT uniquement (type string JSON). Ne jamais envoyer d'objet JSON. Exemple valide: \"shadow\".")
             @NotNull(message = "player1Nickname est obligatoire.")
+            @NotBlank(message = "player1Nickname est obligatoire.")
             String player1Nickname,
             @JsonPropertyDescription("Pseudo du joueur 2 en TEXTE BRUT uniquement (type string JSON). Ne jamais envoyer d'objet JSON. Exemple valide: \"test\".")
             @NotNull(message = "player2Nickname est obligatoire.")
+            @NotBlank(message = "player2Nickname est obligatoire.")
             String player2Nickname,
             @JsonPropertyDescription("Score du joueur 1, entier >= 0.")
+            @Min(value = 0, message = "score1 doit être supérieur ou égal à 0.")
             int score1,
             @JsonPropertyDescription("Score du joueur 2, entier >= 0.")
+            @Min(value = 0, message = "score2 doit être supérieur ou égal à 0.")
             int score2
     ) {
     }
@@ -254,9 +260,11 @@ public class OracleTools {
     public record PredictMatchWinnerRequest(
             @JsonPropertyDescription("Pseudo du joueur 1 en texte brut. Exemple: \"shadow\".")
             @NotNull(message = "player1Nickname est obligatoire.")
+            @NotBlank(message = "player1Nickname est obligatoire.")
             String player1Nickname,
             @JsonPropertyDescription("Pseudo du joueur 2 en texte brut. Exemple: \"test\".")
             @NotNull(message = "player2Nickname est obligatoire.")
+            @NotBlank(message = "player2Nickname est obligatoire.")
             String player2Nickname
     ) {
     }

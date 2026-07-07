@@ -21,6 +21,11 @@ public class AuthController {
 
     private final AuthService authService;
 
+    /**
+     * Construit le contrôleur d'authentification.
+     *
+     * @param authService service applicatif d'authentification
+     */
     public AuthController(AuthService authService) {
         this.authService = authService;
     }

@@ -27,6 +27,11 @@ public class TournamentController {
 
     private final TournamentService tournamentService;
 
+    /**
+     * Construit le contrôleur de tournoi.
+     *
+     * @param tournamentService service applicatif de gestion du tournoi
+     */
     public TournamentController(TournamentService tournamentService) {
         this.tournamentService = tournamentService;
     }

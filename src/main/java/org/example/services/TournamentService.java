@@ -22,11 +22,17 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Service
-public class TournamentService {
+public class TournamentService implements LeagueService {
     private static final Logger logger = LoggerFactory.getLogger(TournamentService.class);
     private final PlayerRepository playerRepository;
     private final MatchRepository matchRepository;
 
+    /**
+     * Construit le service de tournoi avec ses dépôts métier.
+     *
+     * @param playerRepository dépôt d'accès aux joueurs
+     * @param matchRepository dépôt d'accès aux matchs
+     */
     public TournamentService(PlayerRepository playerRepository, MatchRepository matchRepository) {
         if (playerRepository == null) {
             throw new NullPointerException("Le dépôt des joueurs ne doit pas être nul.");
@@ -54,17 +60,17 @@ public class TournamentService {
             throw new BusinessException("INVALID_NICKNAME", "Le pseudo est obligatoire.");
         }
         if (level < 0) {
-            throw new BusinessException("INVALID_LEVEL", "Le niveau doit etre superieur ou egal a 0.");
+            throw new BusinessException("INVALID_LEVEL", "Le niveau doit être supérieur ou égal à 0.");
         }
         if (playerRepository.findByNicknameIgnoreCase(nickname).isPresent()) {
-            logger.warn("Attempted to add duplicate player: {}", nickname);
+            logger.warn("Tentative d'ajout d'un joueur déjà existant : {}", nickname);
             throw new DuplicatePlayerException("Un joueur avec ce pseudo existe déjà.");
         }
 
         Player newPlayer = new Player(0, nickname, level, 0);
         Player savedPlayer = playerRepository.save(newPlayer);
-        logger.info("Player added successfully: {}", nickname);
-        return new ActionResponseDTO(savedPlayer.getId(), "Joueur cree avec succes.", Instant.now());
+        logger.info("Joueur ajouté avec succès : {}", nickname);
+        return new ActionResponseDTO(savedPlayer.getId(), "Joueur créé avec succès.", Instant.now());
     }
 
     /**
@@ -82,8 +88,8 @@ public class TournamentService {
     @Transactional
     public ActionResponseDTO createMatch(int p1Id, int p2Id, int score1, int score2) {
         if (p1Id == p2Id) {
-            logger.error("Invalid match: A player cannot play against themselves (ID: {})", p1Id);
-            throw new InvalidMatchException("SAME_PLAYER_MATCHUP", "Un joueur ne peut pas s'affronter lui-meme.");
+            logger.error("Match invalide : un joueur ne peut pas s'affronter lui-même (ID : {})", p1Id);
+            throw new InvalidMatchException("SAME_PLAYER_MATCHUP", "Un joueur ne peut pas s'affronter lui-même.");
         }
 
         Player p1 = playerRepository.findById(p1Id)
@@ -92,8 +98,8 @@ public class TournamentService {
                 .orElseThrow(() -> new PlayerNotFoundException("Joueur 2 introuvable."));
 
         if (score1 < 0 || score2 < 0) {
-            logger.error("Invalid match score: {} - {}", score1, score2);
-            throw new InvalidMatchException("INVALID_SCORE", "Les scores ne peuvent pas etre negatifs.");
+            logger.error("Score de match invalide : {} - {}", score1, score2);
+            throw new InvalidMatchException("INVALID_SCORE", "Les scores ne peuvent pas être négatifs.");
         }
 
         Match newMatch = new Match(0, p1, p2, score1, score2, LocalDate.now());
@@ -104,8 +110,8 @@ public class TournamentService {
         playerRepository.save(p1);
         playerRepository.save(p2);
         Match savedMatch = matchRepository.save(newMatch);
-        logger.info("Match recorded successfully between {} and {}", p1.getNickname(), p2.getNickname());
-        return new ActionResponseDTO(savedMatch.getId(), "Match cree avec succes.", Instant.now());
+        logger.info("Match enregistré avec succès entre {} et {}", p1.getNickname(), p2.getNickname());
+        return new ActionResponseDTO(savedMatch.getId(), "Match créé avec succès.", Instant.now());
     }
 
     /**
@@ -142,6 +148,35 @@ public class TournamentService {
      */
     public TotalScoreDTO calculateTotalTournamentScore() {
         return new TotalScoreDTO(playerRepository.sumAllScores());
+    }
+
+    /**
+     * Retourne l'identifiant d'un joueur à partir de son pseudo.
+     *
+     * @param nickname pseudo du joueur recherché
+     * @return identifiant du joueur trouvé
+     * @throws PlayerNotFoundException si le joueur n'existe pas
+     */
+    @Override
+    public int getPlayerIdByNickname(String nickname) {
+        Player player = playerRepository.findByNicknameIgnoreCase(nickname)
+                .orElseThrow(() -> new PlayerNotFoundException(
+                        "ERREUR MÉTIER : Le joueur [" + nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."));
+        return player.getId();
+    }
+
+    /**
+     * Charge un joueur à partir de son pseudo.
+     *
+     * @param nickname pseudo du joueur recherché
+     * @return joueur trouvé
+     * @throws PlayerNotFoundException si le joueur n'existe pas
+     */
+    @Override
+    public Player getPlayerByNickname(String nickname) {
+        return playerRepository.findByNicknameIgnoreCase(nickname)
+                .orElseThrow(() -> new PlayerNotFoundException(
+                        "ERREUR MÉTIER : Le joueur [" + nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."));
     }
 
     private PlayerDTO toPlayerDTO(Player player) {

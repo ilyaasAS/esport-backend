@@ -37,7 +37,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
-        log.error("Erreur [BUSINESS] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [METIER] sur {}: {}", request.getRequestURI(), ex.getMessage());
         HttpStatus status = mapBusinessStatus(ex.getErrorCode());
         return buildResponse(status, ex.getErrorCode(), ex.getMessage(), request.getRequestURI(), null);
     }
@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [VALIDATION] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [VALIDATION_DONNEES] sur {}: {}", request.getRequestURI(), ex.getMessage());
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             fieldErrors.put(error.getField(), error.getDefaultMessage());
@@ -80,7 +80,7 @@ public class GlobalExceptionHandler {
             UserAlreadyExistsException ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [USER_ALREADY_EXISTS] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [UTILISATEUR_DEJA_EXISTANT] sur {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, "USER_ALREADY_EXISTS", ex.getMessage(), request.getRequestURI(), null);
     }
 
@@ -96,7 +96,7 @@ public class GlobalExceptionHandler {
             InvalidCredentialsException ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [INVALID_CREDENTIALS] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [IDENTIFIANTS_INVALIDES] sur {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", ex.getMessage(), request.getRequestURI(), null);
     }
 
@@ -112,7 +112,7 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [DATA_INTEGRITY] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [INTEGRITE_DES_DONNEES] sur {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(
                 HttpStatus.CONFLICT,
                 "DATA_INTEGRITY_VIOLATION",
@@ -134,7 +134,7 @@ public class GlobalExceptionHandler {
             PersistenceEntityNotFoundException ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [PERSISTENCE_ENTITY_NOT_FOUND] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [ENTITE_PERSISTEE_INTROUVABLE] sur {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.NOT_FOUND, "PERSISTENCE_ENTITY_NOT_FOUND", ex.getMessage(), request.getRequestURI(), null);
     }
 
@@ -150,7 +150,7 @@ public class GlobalExceptionHandler {
             PersistenceAccessException ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [PERSISTENCE_ACCESS] sur {}: {}", request.getRequestURI(), ex.getMessage());
+        log.error("Erreur [ACCES_PERSISTENCE] sur {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "PERSISTENCE_ACCESS_ERROR",
@@ -172,7 +172,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request
     ) {
-        log.error("Erreur [INTERNAL_SERVER_ERROR] sur {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+        log.error("Erreur [ERREUR_INTERNE_SERVEUR] sur {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_SERVER_ERROR",

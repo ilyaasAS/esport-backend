@@ -2,24 +2,57 @@ package org.example.oracle;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class OracleServiceSecurityTest {
 
     private OracleService oracleService;
+    @Mock
+    private OracleIntentClassifier intentClassifier;
+    @Mock
+    private OraclePromptBuilder promptBuilder;
+    @Mock
+    private OracleResponseSanitizer responseSanitizer;
+    @Mock
+    private OracleDeterministicExecutor deterministicExecutor;
 
     @BeforeEach
     void setUp() {
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         ChatClient chatClient = mock(ChatClient.class);
-        OracleTools oracleTools = mock(OracleTools.class);
+        OracleIntentClassifier realIntentClassifier = new OracleIntentClassifier();
+        OracleDeterministicExecutor realExecutor = new OracleDeterministicExecutor(mock(OracleTools.class));
 
         when(builder.build()).thenReturn(chatClient);
-        oracleService = new OracleService(builder, oracleTools);
+        when(intentClassifier.classifyIntent(anyString(), anyBoolean()))
+                .thenAnswer(invocation -> realIntentClassifier.classifyIntent(
+                        invocation.getArgument(0),
+                        invocation.getArgument(1)
+                ));
+        when(promptBuilder.buildSystemPrompt(any(), anyBoolean())).thenReturn("system-prompt");
+        when(responseSanitizer.sanitizeOracleContent(anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(responseSanitizer.sanitizeTone(anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(deterministicExecutor.execute(any(), anyString(), anyBoolean()))
+                .thenAnswer(invocation -> realExecutor.execute(
+                        invocation.getArgument(0),
+                        invocation.getArgument(1),
+                        invocation.getArgument(2)
+                ));
+
+        oracleService = new OracleService(builder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor);
     }
 
     @Test

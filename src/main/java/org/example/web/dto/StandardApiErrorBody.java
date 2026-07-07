@@ -35,7 +35,7 @@ public final class StandardApiErrorBody {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());
-        body.put("error", status.getReasonPhrase());
+        body.put("error", toFrenchHttpErrorLabel(status));
         body.put("errorCode", errorCode);
         body.put("message", message);
         body.put("path", path);
@@ -43,5 +43,16 @@ public final class StandardApiErrorBody {
             body.put("details", details);
         }
         return body;
+    }
+
+    private static String toFrenchHttpErrorLabel(HttpStatus status) {
+        return switch (status.value()) {
+            case 400 -> "Requête invalide";
+            case 401 -> "Non autorisé";
+            case 403 -> "Accès interdit";
+            case 404 -> "Ressource non trouvée";
+            case 500 -> "Erreur interne du serveur";
+            default -> "Erreur système";
+        };
     }
 }

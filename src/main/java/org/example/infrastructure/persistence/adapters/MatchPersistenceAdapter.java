@@ -14,12 +14,21 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * Adaptateur de persistence des matchs vers Spring Data JPA.
+ */
 @Repository
 public class MatchPersistenceAdapter implements MatchRepository {
 
     private final SpringDataMatchRepository springDataMatchRepository;
     private final SpringDataPlayerRepository springDataPlayerRepository;
 
+    /**
+     * Construit l'adaptateur avec ses repositories Spring Data.
+     *
+     * @param springDataMatchRepository repository JPA des matchs
+     * @param springDataPlayerRepository repository JPA des joueurs
+     */
     public MatchPersistenceAdapter(
             SpringDataMatchRepository springDataMatchRepository,
             SpringDataPlayerRepository springDataPlayerRepository
@@ -28,6 +37,12 @@ public class MatchPersistenceAdapter implements MatchRepository {
         this.springDataPlayerRepository = springDataPlayerRepository;
     }
 
+    /**
+     * Charge tous les matchs depuis la base.
+     *
+     * @return liste des matchs du domaine
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public List<Match> findAll() {
         try {
@@ -40,6 +55,14 @@ public class MatchPersistenceAdapter implements MatchRepository {
         }
     }
 
+    /**
+     * Enregistre un match après résolution des entités joueurs associées.
+     *
+     * @param match match à persister
+     * @return match persistant mis à jour
+     * @throws PersistenceEntityNotFoundException si un joueur associé est introuvable
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public Match save(Match match) {
         try {

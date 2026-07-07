@@ -33,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     /**
-     * Extrait le jeton Bearer, valide son contenu, puis injecte l'authentification dans le contexte.
+     * Extrait le jeton d'authentification porteur, valide son contenu, puis injecte l'authentification dans le contexte.
      *
      * @param request requête HTTP entrante
      * @param response réponse HTTP en cours

@@ -12,15 +12,29 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Adaptateur de persistence des joueurs vers Spring Data JPA.
+ */
 @Repository
 public class PlayerPersistenceAdapter implements PlayerRepository {
 
     private final SpringDataPlayerRepository springDataPlayerRepository;
 
+    /**
+     * Construit l'adaptateur avec son repository Spring Data.
+     *
+     * @param springDataPlayerRepository repository JPA des joueurs
+     */
     public PlayerPersistenceAdapter(SpringDataPlayerRepository springDataPlayerRepository) {
         this.springDataPlayerRepository = springDataPlayerRepository;
     }
 
+    /**
+     * Charge tous les joueurs depuis la base.
+     *
+     * @return liste des joueurs du domaine
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public List<Player> findAll() {
         try {
@@ -33,6 +47,13 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         }
     }
 
+    /**
+     * Recherche un joueur par identifiant.
+     *
+     * @param id identifiant du joueur
+     * @return joueur éventuel correspondant
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public Optional<Player> findById(int id) {
         try {
@@ -42,6 +63,13 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         }
     }
 
+    /**
+     * Recherche un joueur par pseudo sans tenir compte de la casse.
+     *
+     * @param nickname pseudo à rechercher
+     * @return joueur éventuel correspondant
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public Optional<Player> findByNicknameIgnoreCase(String nickname) {
         try {
@@ -51,6 +79,13 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         }
     }
 
+    /**
+     * Enregistre un joueur.
+     *
+     * @param player joueur à persister
+     * @return joueur persistant mis à jour
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public Player save(Player player) {
         try {
@@ -62,6 +97,12 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         }
     }
 
+    /**
+     * Retourne les trois meilleurs joueurs par score décroissant.
+     *
+     * @return top 3 des joueurs
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public List<Player> findTop3ByScoreDesc() {
         try {
@@ -74,6 +115,12 @@ public class PlayerPersistenceAdapter implements PlayerRepository {
         }
     }
 
+    /**
+     * Calcule le score total agrégé de tous les joueurs.
+     *
+     * @return score total agrégé
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
     @Override
     public int sumAllScores() {
         try {
