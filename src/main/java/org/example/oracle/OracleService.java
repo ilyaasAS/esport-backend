@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.text.Normalizer;
 import java.time.Duration;
@@ -218,7 +219,8 @@ public class OracleService {
                     .onErrorResume(Exception.class, ex -> {
                         log.warn("Microservice LangGraph indisponible ou en erreur ({}). Bascule automatique vers le pool d'agents Spring AI locaux (V1 fallback).",
                                 ex.getMessage());
-                        return fallbackToJavaAgents(intent, userMessage, isAdmin);
+                        return fallbackToJavaAgents(intent, userMessage, isAdmin)
+                                .subscribeOn(Schedulers.boundedElastic());
                     });
         });
     }
