@@ -64,6 +64,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/oracle/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/players").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/matches").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/matches/predict").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )

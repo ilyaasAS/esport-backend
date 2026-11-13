@@ -56,6 +56,26 @@ public class MatchPersistenceAdapter implements MatchRepository {
     }
 
     /**
+     * Charge l'historique direct des matchs entre deux joueurs depuis MySQL.
+     *
+     * @param player1Id identifiant du premier joueur
+     * @param player2Id identifiant du second joueur
+     * @return liste des matchs ordonnés chronologiquement
+     * @throws PersistenceAccessException en cas d'erreur d'accès aux données
+     */
+    @Override
+    public List<Match> findHeadToHeadMatches(int player1Id, int player2Id) {
+        try {
+            return springDataMatchRepository.findHeadToHeadMatches(player1Id, player2Id)
+                    .stream()
+                    .map(MatchMapper::toDomain)
+                    .toList();
+        } catch (DataAccessException e) {
+            throw new PersistenceAccessException("Erreur lors du chargement de l'historique direct depuis MySQL.", e);
+        }
+    }
+
+    /**
      * Enregistre un match après résolution des entités joueurs associées.
      *
      * @param match match à persister

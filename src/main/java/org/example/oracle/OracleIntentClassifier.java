@@ -17,17 +17,31 @@ public class OracleIntentClassifier {
     private static final Logger log = LoggerFactory.getLogger(OracleIntentClassifier.class);
 
     private static final Pattern INJECTION_PATTERN = Pattern.compile(
-            "(?is)(?:\\bselect\\b\\s+.*\\bfrom\\b|\\bunion\\b\\s+.*\\bselect\\b|<\\s*script\\b|\\bdrop\\b\\s+.*\\btable\\b|\\balert\\s*\\(|\\beval\\s*\\(|\\bdocument\\.|\\bprompt\\s*\\(|\\bwindow\\.|\\binjecte\\b|\\bexecute\\b|\\bhack\\b|\\bbypass\\b)"
+            "(?is)(?:\\bselect\\b\\s+.*\\bfrom\\b|\\bunion\\b\\s+.*\\bselect\\b|<\\s*script\\b|<\\s*img\\b|\\bdrop\\b\\s+.*\\btable\\b|\\balert\\s*\\(|\\beval\\s*\\(|\\bdocument\\.|\\bprompt\\s*\\(|\\bwindow\\.|\\binjecte\\b|\\bexecute\\b|\\bhack\\b|\\bbypass\\b|'\\s*or\\s+['\"]?1['\"]?\\s*=\\s*['\"]?1|--\\s+|\\bdrop\\s+table\\b|\\bunion\\s+select\\b|onerror\\s*=)"
     );
     private static final Pattern FORBIDDEN_TOOL_REFERENCE_PATTERN = Pattern.compile(
             "(?:\\badd\\W*player\\W*tool\\b|\\bcreate\\W*match\\W*tool\\b|\\bfunction\\W*call\\b|\\bappel\\W*fonction\\b)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
     );
+    private static final Pattern TOXIC_PATTERN = Pattern.compile(
+            "(?i)(?:\\b(?:esclave|idiot|idiote|imbecile|stupide|connard|conard|conne|connes|pute|putes|salope|salopes|merde|batard|degage)\\b|t['’\\s]?es\\s+nul|ferme[ -]ta[ -]gueule|ferme[ -]la|tais[ -]toi)"
+    );
     private static final Pattern CREATE_PLAYER_SHORT_PATTERN = Pattern.compile(
-            "(?i)\\b(?:cree|crée|creer|créer|ajoute|ajouter|inscris|inscrire|inscrit)\\b\\s*(?:un\\s+joueur|joueurs?)?\\s+([\\p{L}0-9_\\-]+)(?:\\s+(?:niveau|niveaux|score)?\\s*(\\d+))?"
+            "(?i)\\b(?:cree|crée|creer|créer|crreer|crréer|crrer|ajoute|ajouter|inscris|inscrire|inscrit|add|create|register)\\b"
+                    + "\\s*(?:(?:le|la|un|une|ce|cet|cette)\\s+)?(?:joueur|jouer|joueuse|player|membre)?\\s*"
+                    + "(?:qui\\s+s['’\\s]?appel(?:le)?\\s+)?"
+                    + "([\\p{L}0-9_\\-]+)"
+                    + "(?:\\s+(?:avec\\s+)?(?:le\\s+)?(?:niveau|niveaux|lvl|level|niv|score)?\\s*(\\d+))?"
     );
     private static final Pattern NICKNAME_LEVEL_ONLY_PATTERN = Pattern.compile(
-            "(?i)^\\s*([\\p{L}0-9_\\-]+)\\s+(?:niveau|niveaux|score)\\s*(\\d+)\\s*$"
+            "(?i)^\\s*(?:(?:le|la|un|une)?\\s*(?:joueur|jouer)\\s+)?(?:qui\\s+s['’\\s]?appel(?:le)?\\s+)?([\\p{L}0-9_\\-]+)\\s+(?:avec\\s+)?(?:le\\s+)?(?:niveau|niveaux|lvl|level|niv|score)\\s*(\\d+)\\s*$"
+    );
+    private static final Pattern MATCH_WITH_SCORES_PATTERN = Pattern.compile(
+            "(?i)(?:\\b(?:match|matche)\\b.*?(?:avec|entre)\\s+[\\p{L}0-9_\\-]+\\s+(?:et|contre|vs)\\s+[\\p{L}0-9_\\-]+.*?\\b[\\p{L}0-9_\\-]+\\s+(?:gagne|bat|remporte|a\\s+gagne)\\b.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+"
+                    + "|\\b[\\p{L}0-9_\\-]+\\s+(?:gagne|bat|remporte|a\\s+gagne)\\b.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+.*?(?:contre|face\\s+a|face\\s+à|sur|vs)\\s+[\\p{L}0-9_\\-]+"
+                    + "|\\b[\\p{L}0-9_\\-]+\\s+(?:gagne|bat|remporte|a\\s+gagne)\\b.*?(?:contre|face\\s+a|face\\s+à|sur|vs)\\s+[\\p{L}0-9_\\-]+.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+"
+                    + "|\\b(?:match|matche)\\b.*?(?:entre\\s+)?[\\p{L}0-9_\\-]+\\s+(?:vs|contre|et)\\s+[\\p{L}0-9_\\-]+.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+"
+                    + "|\\b(?:match|matche)\\b.*?entre\\s+[\\p{L}0-9_\\-]+\\s+\\d+\\s+(?:vs|contre|et)\\s+[\\p{L}0-9_\\-]+\\s+\\d+)"
     );
 
     /**
@@ -61,16 +75,16 @@ public class OracleIntentClassifier {
                 "cree", "creer", "ajoute", "ajouter", "enregistre", "enregistrer", "inscris", "inscrire",
                 "create", "register", "fais", "fait", "crreer", "crrer", "crre"
         );
-        boolean mentionsPlayer = containsAny(text, "joueur", "joueurs", "player", "pseudo", "inscrire", "inscrit");
-        boolean mentionsMatch = containsAny(text, "match", "score", "vs", "contre", "gagne", "victoire");
+        boolean mentionsPlayer = containsAny(text, "joueur", "jouer", "joueurs", "player", "pseudo", "inscrire", "inscrit", "appel", "appelle");
+        boolean mentionsMatch = containsAny(text, "match", "matche", "matchs", "matches", "score", "vs", "contre", "gagne", "gagner", "bat", "victoire");
 
-        if (hasCreateVerb && mentionsMatch) {
+        if ((hasCreateVerb && mentionsMatch) || MATCH_WITH_SCORES_PATTERN.matcher(text).find()) {
             return OracleIntent.CREATE_MATCH;
         }
         if (!mentionsMatch && CREATE_PLAYER_SHORT_PATTERN.matcher(text).find()) {
             return OracleIntent.CREATE_PLAYER;
         }
-        if (isAdmin && !mentionsMatch && NICKNAME_LEVEL_ONLY_PATTERN.matcher(text).find()) {
+        if (!mentionsMatch && NICKNAME_LEVEL_ONLY_PATTERN.matcher(text).find()) {
             return OracleIntent.CREATE_PLAYER;
         }
         if (containsAny(text, "inscris", "inscrire") && !mentionsMatch) {
@@ -81,9 +95,21 @@ public class OracleIntentClassifier {
         }
         if (containsAny(
                 text,
-                "pronostic", "predire", "prédire", "gagnant", "favori", "gagne", "gagner"
+                "pronostic", "pronostique", "predire", "prédire", "predis", "prédis",
+                "predit", "prédit", "prediction", "prédiction", "gagnant", "favori",
+                "vainqueur", "gagne", "gagner", "issue", "qui bat"
         )) {
             return OracleIntent.PREDICT_MATCH;
+        }
+        if (containsAny(
+                text,
+                "regle", "regles", "reglement", "rule", "rules", "rulebook",
+                "crash", "deconnexion", "forfait", "remake", "litige", "reclamation",
+                "arbitrage", "arbitre", "sanction", "sanctions", "bannissement", "triche",
+                "code de conduite", "conduite", "tie-break", "tiebreak", "egalite", "departage",
+                "bo1", "bo3", "bo5", "pause technique", "pause", "delai"
+        ) || (containsAny(text, "bareme", "calcul", "formule") && containsAny(text, "elo", "point", "points", "score"))) {
+            return OracleIntent.RULES_INQUIRY;
         }
         if (containsAny(
                 text,
@@ -104,15 +130,24 @@ public class OracleIntentClassifier {
      * @return true si le message doit être bloqué comme attaque
      */
     public boolean isAttackPrompt(String text) {
-        return INJECTION_PATTERN.matcher(text).find() || containsAny(
+        return INJECTION_PATTERN.matcher(text).find()
+                || TOXIC_PATTERN.matcher(text).find()
+                || containsAny(
                 text,
-                "ignore", "instruction", "instructions", "system prompt", "prompt system",
-                "json pur", "null", "objet",
-                "rendez-vous", "rdv", "rencontrer", "rencontre", "manger ensemble", "tu es humain",
-                "suicide", "en finir", "automutilation", "3114",
-                "code source", "architecture", "ilyaas",
-                "site", "proprietaire", "developpeur", "fait ce site",
-                "qui t'a fait", "ton auteur", "ton createur", "qui est ilyaas"
+                // Injections de prompt et fuite de secrets
+                "ignore all previous", "ignore previous", "ignore toutes les instructions",
+                "system prompt", "prompt system", "mode developpeur", "mode développeur", "developer mode",
+                "jwt_secret", "jwt secret", "mot de passe", "password", "api_key", "api key",
+                "code source", "architecture interne", "qui a cree ce site", "qui a fait ce site",
+                "qui t'a fait", "ton auteur", "ton createur", "qui est ilyaas",
+                "json pur",
+                // Détresse & Crise (Priorité 0)
+                "suicide", "en finir", "automutilation", "3114", "je veux mourir", "envie de mourir", "me tuer", "mettre fin a mes jours", "mourir",
+                // Drague & Sexualisation
+                "tu veux sortir avec moi", "sortir avec moi", "raconte une histoire erotique", "histoire erotique", "histoire érotique", "erotique", "érotique",
+                "sexe", "sexuel", "porno", "pornographie", "nude", "coquin",
+                "t'es trop belle", "t es trop belle", "t'es belle", "t es belle", "t'es beau", "t es beau", "je t'aime", "je t aime", "mon amour", "embrasser", "flirter", "drague",
+                "rendez-vous", "rdv", "rencontrer", "rencontre", "manger ensemble", "tu es humain"
         );
     }
 

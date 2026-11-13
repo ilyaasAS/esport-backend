@@ -1,5 +1,6 @@
 package org.example.oracle;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +45,18 @@ public class OracleController {
     @PostMapping(path = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chat(
             @Valid @RequestBody OracleChatRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletResponse response
     ) {
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentification requise.");
         }
+        // En-têtes indispensables pour forcer Nginx et les proxies à délivrer le flux SSE sans tamponnage
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no");
+
         // Le badge est déterminé au point d'entrée servlet, avant toute exécution asynchrone.
         final boolean isAdmin = oracleService.isAdmin(authentication.getAuthorities());
         return oracleService.streamChat(request.message(), isAdmin);

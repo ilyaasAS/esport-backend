@@ -8,12 +8,17 @@ import org.example.models.Match;
 import org.example.models.Player;
 import org.example.repositories.MatchRepository;
 import org.example.repositories.PlayerRepository;
+import org.example.services.strategy.EloRatingStrategy;
+import org.example.services.strategy.PredictionStrategy;
 import org.example.web.dto.ActionResponseDTO;
 import org.example.web.dto.MatchDTO;
+import org.example.web.dto.MatchPredictionDTO;
 import org.example.web.dto.PlayerDTO;
 import org.example.web.dto.TotalScoreDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,22 +31,43 @@ public class TournamentService implements LeagueService {
     private static final Logger logger = LoggerFactory.getLogger(TournamentService.class);
     private final PlayerRepository playerRepository;
     private final MatchRepository matchRepository;
+    private final PredictionStrategy predictionStrategy;
 
     /**
-     * Construit le service de tournoi avec ses dépôts métier.
+     * Construit le service de tournoi avec ses dépôts métier et sa stratégie prédictive.
      *
      * @param playerRepository dépôt d'accès aux joueurs
      * @param matchRepository dépôt d'accès aux matchs
+     * @param predictionStrategy stratégie de cotation injectée
      */
-    public TournamentService(PlayerRepository playerRepository, MatchRepository matchRepository) {
+    @Autowired
+    public TournamentService(
+            PlayerRepository playerRepository,
+            MatchRepository matchRepository,
+            @Qualifier("eloStrategy") PredictionStrategy predictionStrategy
+    ) {
         if (playerRepository == null) {
             throw new NullPointerException("Le dépôt des joueurs ne doit pas être nul.");
         }
         if (matchRepository == null) {
             throw new NullPointerException("Le dépôt des matchs ne doit pas être nul.");
         }
+        if (predictionStrategy == null) {
+            throw new NullPointerException("La stratégie de prédiction ne doit pas être nulle.");
+        }
         this.playerRepository = playerRepository;
         this.matchRepository = matchRepository;
+        this.predictionStrategy = predictionStrategy;
+    }
+
+    /**
+     * Constructeur surchargé garantissant la rétrocompatibilité pour les instanciations directes en test unitaire.
+     *
+     * @param playerRepository dépôt d'accès aux joueurs
+     * @param matchRepository dépôt d'accès aux matchs
+     */
+    public TournamentService(PlayerRepository playerRepository, MatchRepository matchRepository) {
+        this(playerRepository, matchRepository, new EloRatingStrategy());
     }
 
     /**
@@ -177,6 +203,34 @@ public class TournamentService implements LeagueService {
         return playerRepository.findByNicknameIgnoreCase(nickname)
                 .orElseThrow(() -> new PlayerNotFoundException(
                         "ERREUR MÉTIER : Le joueur [" + nickname + "] n'existe pas dans la base. Veuillez demander à l'utilisateur de le créer ou de corriger le pseudo."));
+    }
+
+    /**
+     * Établit un pronostic probabiliste entre deux joueurs à partir de leurs identifiants
+     * en déléguant à la stratégie de cotation injectée et en fournissant l'historique direct (H2H).
+     *
+     * @param player1Id identifiant du premier joueur
+     * @param player2Id identifiant du second joueur
+     * @return DTO contenant les identifiants, pseudos, probabilités et favori
+     * @throws InvalidMatchException si player1Id == player2Id
+     * @throws PlayerNotFoundException si un des joueurs n'existe pas
+     */
+    @Override
+    public MatchPredictionDTO predictMatch(int player1Id, int player2Id) {
+        if (player1Id == player2Id) {
+            logger.error("Pronostic impossible : un joueur ne peut pas s'affronter lui-même (ID : {})", player1Id);
+            throw new InvalidMatchException("SAME_PLAYER_MATCHUP", "Un joueur ne peut pas s'affronter lui-même.");
+        }
+
+        Player p1 = playerRepository.findById(player1Id)
+                .orElseThrow(() -> new PlayerNotFoundException("Joueur 1 introuvable."));
+        Player p2 = playerRepository.findById(player2Id)
+                .orElseThrow(() -> new PlayerNotFoundException("Joueur 2 introuvable."));
+
+        List<Match> headToHeadHistory = matchRepository.findHeadToHeadMatches(player1Id, player2Id);
+        logger.debug("Historique H2H récupéré entre {} et {} : {} match(s)", p1.getNickname(), p2.getNickname(), headToHeadHistory.size());
+
+        return predictionStrategy.calculateProbability(p1, p2, headToHeadHistory);
     }
 
     private PlayerDTO toPlayerDTO(Player player) {

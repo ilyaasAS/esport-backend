@@ -15,9 +15,17 @@ public class OracleResponseSanitizer {
      * @return chunk assaini sans altérer la continuité des mots en streaming
      */
     public String sanitizeOracleContent(String content) {
-        String safeContent = content == null ? "" : content;
-        // Sécurisé pour le streaming : aucun trim/split pour ne jamais couper un mot entre deux segments.
-        return safeContent.replace("{", "").replace("}", "");
+        if (content == null || content.isEmpty()) {
+            return "";
+        }
+        String trimmed = content.trim();
+        // Neutralise toute fuite résiduelle de structure FunctionCall JSON
+        if ((trimmed.startsWith("{") || trimmed.startsWith("\"name\""))
+                && (trimmed.contains("\"name\"") || trimmed.contains("Tool"))
+                && trimmed.contains("parameters")) {
+            return "";
+        }
+        return content;
     }
 
     /**

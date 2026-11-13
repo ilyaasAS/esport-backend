@@ -1,9 +1,11 @@
 package org.example.oracle;
 
 import org.example.exceptions.BusinessException;
+import org.example.oracle.agents.EsportAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
@@ -32,18 +34,32 @@ public class OracleService {
             "getPlayersRankingTool",
             "getMatchesTool",
             "getMatchesRankingTool",
-            "predictMatchWinnerTool"
+            "predictMatchWinnerTool",
+            "queryTournamentRulesTool"
     };
     private static final String[] CREATE_PLAYER_TOOLS = {"addPlayerTool"};
     private static final String[] CREATE_MATCH_TOOLS = {"createMatchTool"};
+    private static final String[] PREDICT_TOOLS = {"predictMatchWinnerTool"};
+    private static final String[] RULES_TOOLS = {"queryTournamentRulesTool"};
     private static final Pattern CREATE_PLAYER_FALLBACK_PATTERN = Pattern.compile(
-            "(?i)\\b(?:cree|crée|creer|créer|crreer|crréer|crrer|ajoute|ajouter|inscris|inscrire|inscrit)\\b\\s*(?:un\\s+joueur|joueurs?)?\\s+([\\p{L}0-9_\\-]+)(?:\\s+(?:niveau|niveaux|score)?\\s*(\\d+))?"
+            "(?i)\\b(?:cree|crée|creer|créer|crreer|crréer|crrer|ajoute|ajouter|inscris|inscrire|inscrit|add|create|register)\\b"
+                    + "\\s*(?:(?:le|la|un|une|ce|cet|cette)\\s+)?(?:joueur|jouer|joueuse|player|membre)?\\s*"
+                    + "(?:qui\\s+s['’\\s]?appel(?:le)?\\s+)?"
+                    + "([\\p{L}0-9_\\-]+)"
+                    + "(?:\\s+(?:avec\\s+)?(?:le\\s+)?(?:niveau|niveaux|lvl|level|niv|score)?\\s*(\\d+))?"
     );
     private static final Pattern PLAYER_LEVEL_ONLY_PATTERN = Pattern.compile(
-            "(?i)^\\s*([\\p{L}0-9_\\-]+)\\s+(?:niveau|niveaux|score)\\s*(\\d+)\\s*$"
+            "(?i)^\\s*(?:(?:le|la|un|une)?\\s*(?:joueur|jouer)\\s+)?(?:qui\\s+s['’\\s]?appel(?:le)?\\s+)?([\\p{L}0-9_\\-]+)\\s+(?:avec\\s+)?(?:le\\s+)?(?:niveau|niveaux|lvl|level|niv|score)\\s*(\\d+)\\s*$"
     );
     private static final Pattern CREATE_MATCH_FALLBACK_PATTERN = Pattern.compile(
-            "(?i)\\b(?:cree|crée|creer|créer|enregistre|enregistrer|fais|fait)\\b.*?\\bmatch\\b.*?\\b([\\p{L}0-9_\\-]+)\\b\\s+(?:vs|contre|et)\\s+\\b([\\p{L}0-9_\\-]+)\\b.*?(\\d+)\\s*(?:a|à|-)\\s*(\\d+)"
+            "(?i)\\b(?:cree|crée|creer|créer|enregistre|enregistrer|fais|fait|nouveau|ajoute|ajouter)\\b.*?\\b(?:match|matche)\\b.*?([\\p{L}0-9_\\-]+)\\s+(?:vs|contre|et)\\s+([\\p{L}0-9_\\-]+)"
+    );
+    private static final Pattern MATCH_WITH_SCORES_PATTERN = Pattern.compile(
+            "(?i)(?:\\b(?:match|matche)\\b.*?(?:avec|entre)\\s+[\\p{L}0-9_\\-]+\\s+(?:et|contre|vs)\\s+[\\p{L}0-9_\\-]+.*?\\b[\\p{L}0-9_\\-]+\\s+(?:gagne|bat|remporte|a\\s+gagne)\\b.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+"
+                    + "|\\b[\\p{L}0-9_\\-]+\\s+(?:gagne|bat|remporte|a\\s+gagne)\\b.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+.*?(?:contre|face\\s+a|face\\s+à|sur|vs)\\s+[\\p{L}0-9_\\-]+"
+                    + "|\\b[\\p{L}0-9_\\-]+\\s+(?:gagne|bat|remporte|a\\s+gagne)\\b.*?(?:contre|face\\s+a|face\\s+à|sur|vs)\\s+[\\p{L}0-9_\\-]+.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+"
+                    + "|\\b(?:match|matche)\\b.*?(?:entre\\s+)?[\\p{L}0-9_\\-]+\\s+(?:vs|contre|et)\\s+[\\p{L}0-9_\\-]+.*?(?:score\\s*)?\\d+\\s*(?:a|à|-|et)\\s*\\d+"
+                    + "|\\b(?:match|matche)\\b.*?entre\\s+[\\p{L}0-9_\\-]+\\s+\\d+\\s+(?:vs|contre|et)\\s+[\\p{L}0-9_\\-]+\\s+\\d+)"
     );
 
     private final ChatClient chatClient;
@@ -51,15 +67,10 @@ public class OracleService {
     private final OraclePromptBuilder promptBuilder;
     private final OracleResponseSanitizer responseSanitizer;
     private final OracleDeterministicExecutor deterministicExecutor;
+    private final List<EsportAgent> agents;
 
     /**
-     * Construit la façade Oracle avec ses composants spécialisés.
-     *
-     * @param chatClientBuilder constructeur du client conversationnel
-     * @param intentClassifier classifieur d'intentions Oracle
-     * @param promptBuilder constructeur de prompt système
-     * @param responseSanitizer assainisseur de contenu Oracle
-     * @param deterministicExecutor exécuteur déterministe prioritaire
+     * Constructeur historique conservé pour la rétrocompatibilité des tests unitaires existants.
      */
     public OracleService(
             ChatClient.Builder chatClientBuilder,
@@ -68,11 +79,34 @@ public class OracleService {
             OracleResponseSanitizer responseSanitizer,
             OracleDeterministicExecutor deterministicExecutor
     ) {
-        this.chatClient = chatClientBuilder.build();
+        this(chatClientBuilder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor, List.of());
+    }
+
+    /**
+     * Construit la façade Oracle avec ses composants spécialisés et son pool d'agents.
+     *
+     * @param chatClientBuilder     constructeur du client conversationnel de secours
+     * @param intentClassifier      classifieur d'intentions Oracle
+     * @param promptBuilder         constructeur de prompt système
+     * @param responseSanitizer     assainisseur de contenu Oracle
+     * @param deterministicExecutor exécuteur déterministe prioritaire
+     * @param agents                pool des sous-agents spécialisés (Multi-Agents)
+     */
+    @Autowired
+    public OracleService(
+            ChatClient.Builder chatClientBuilder,
+            OracleIntentClassifier intentClassifier,
+            OraclePromptBuilder promptBuilder,
+            OracleResponseSanitizer responseSanitizer,
+            OracleDeterministicExecutor deterministicExecutor,
+            @Autowired(required = false) List<EsportAgent> agents
+    ) {
+        this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
         this.intentClassifier = intentClassifier;
         this.promptBuilder = promptBuilder;
         this.responseSanitizer = responseSanitizer;
         this.deterministicExecutor = deterministicExecutor;
+        this.agents = agents != null ? agents : List.of();
     }
 
     /**
@@ -116,24 +150,50 @@ public class OracleService {
         if (isAdmin) {
             return true;
         }
-        String normalizedMessage = normalize(userMessage);
-        boolean looksLikeCreatePlayer = CREATE_PLAYER_FALLBACK_PATTERN.matcher(normalizedMessage).find()
-                || PLAYER_LEVEL_ONLY_PATTERN.matcher(normalizedMessage).find();
-        boolean looksLikeCreateMatch = CREATE_MATCH_FALLBACK_PATTERN.matcher(normalizedMessage).find();
-        if (looksLikeCreatePlayer || looksLikeCreateMatch) {
+        // Pour les utilisateurs USER : lecture, prédictions, salutations, règles et création de joueur sont autorisées
+        if (intent == OracleIntent.PREDICT_MATCH
+                || intent == OracleIntent.READ
+                || intent == OracleIntent.GREETING
+                || intent == OracleIntent.RULES_INQUIRY
+                || intent == OracleIntent.CREATE_PLAYER) {
+            return true;
+        }
+        // La création de match est strictement réservée au rôle ADMIN
+        if (intent == OracleIntent.CREATE_MATCH) {
             return false;
         }
-        return intent != OracleIntent.CREATE_PLAYER && intent != OracleIntent.CREATE_MATCH;
+        String normalizedMessage = normalize(userMessage);
+        boolean looksLikeCreateMatch = CREATE_MATCH_FALLBACK_PATTERN.matcher(normalizedMessage).find()
+                || MATCH_WITH_SCORES_PATTERN.matcher(normalizedMessage).find();
+        if (looksLikeCreateMatch) {
+            return false;
+        }
+        return true;
     }
 
     private Flux<String> prepareResponseFlux(OracleIntent intent, String userMessage, boolean isAdmin) {
         return Flux.defer(() -> {
+            String deterministicResult = deterministicExecutor.execute(intent, userMessage, isAdmin);
+            if (deterministicResult != null) {
+                return Flux.fromIterable(List.of(deterministicResult));
+            }
+
+            // Délégation multi-agents : sélection de l'agent spécialisé compétent
+            if (agents != null && !agents.isEmpty()) {
+                EsportAgent matchedAgent = agents.stream()
+                        .filter(agent -> agent.supports(intent))
+                        .findFirst()
+                        .orElse(null);
+                if (matchedAgent != null) {
+                    log.info("Délégation multi-agents : intention={} -> agent={}", intent, matchedAgent.getClass().getSimpleName());
+                    return matchedAgent.process(userMessage, intent, isAdmin);
+                }
+            }
+
+            // Chaîne de secours unifiée (fallback historique)
             String[] tools = selectTools(intent, isAdmin);
             String systemPrompt = promptBuilder.buildSystemPrompt(intent, isAdmin);
-            String deterministicResult = deterministicExecutor.execute(intent, userMessage, isAdmin);
-            return deterministicResult != null
-                    ? Flux.fromIterable(List.of(deterministicResult))
-                    : callOracle(systemPrompt, userMessage, tools);
+            return callOracle(systemPrompt, userMessage, tools);
         });
     }
 
@@ -141,7 +201,8 @@ public class OracleService {
         String normalizedMessage = normalize(userMessage);
         boolean looksLikeCreatePlayer = CREATE_PLAYER_FALLBACK_PATTERN.matcher(normalizedMessage).find()
                 || PLAYER_LEVEL_ONLY_PATTERN.matcher(normalizedMessage).find();
-        boolean looksLikeCreateMatch = CREATE_MATCH_FALLBACK_PATTERN.matcher(normalizedMessage).find();
+        boolean looksLikeCreateMatch = CREATE_MATCH_FALLBACK_PATTERN.matcher(normalizedMessage).find()
+                || MATCH_WITH_SCORES_PATTERN.matcher(normalizedMessage).find();
 
         OracleIntent resolvedIntent = intentClassifier.classifyIntent(userMessage, isAdmin);
         if (resolvedIntent != OracleIntent.UNKNOWN_ACTION && resolvedIntent != OracleIntent.SMALL_TALK) {
@@ -169,12 +230,39 @@ public class OracleService {
      * @return flux de contenu texte retourné progressivement par le modèle
      */
     private Flux<String> callOracle(String systemPrompt, String userMessage, String[] tools) {
+        if (tools.length > 0) {
+            return Flux.defer(() -> {
+                // Pour les requêtes avec outils, exécute le cycle complet via call() :
+                // Spring AI exécute la fonction, réinjecte son résultat au modèle,
+                // et retourne la réponse finale synthétisée en langage naturel (sans fuite de FunctionCall JSON).
+                String finalContent = chatClient.prompt()
+                        .system(systemPrompt)
+                        .user(userMessage)
+                        .functions(tools)
+                        .call()
+                        .content();
+
+                if (finalContent == null || finalContent.isBlank()) {
+                    return Flux.just("L'Oracle n'a pas pu formuler de réponse.");
+                }
+
+                // Filet de sécurité : interception si le LLM a formulé son intention textuellement au lieu d'appeler l'outil
+                if (finalContent.contains("predictMatchWinnerTool")) {
+                    String fallback = deterministicExecutor.execute(OracleIntent.PREDICT_MATCH, userMessage, true);
+                    if (fallback != null) {
+                        finalContent = fallback;
+                    }
+                }
+
+                // Découpe par mots/espaces pour alimenter le flux SSE de manière fluide vers le frontend
+                String[] words = finalContent.split("(?<=\\s+)");
+                return Flux.fromArray(words);
+            }).timeout(ORACLE_STREAM_TIMEOUT);
+        }
+
         var request = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userMessage);
-        if (tools.length > 0) {
-            request = request.functions(tools);
-        }
         return request.stream().content().timeout(ORACLE_STREAM_TIMEOUT);
     }
 
@@ -190,8 +278,9 @@ public class OracleService {
             case SMALL_TALK -> NO_TOOLS;
             case GREETING -> NO_TOOLS;
             case READ -> READ_TOOLS;
-            case PREDICT_MATCH -> NO_TOOLS;
-            case CREATE_PLAYER -> isAdmin ? CREATE_PLAYER_TOOLS : NO_TOOLS;
+            case PREDICT_MATCH -> PREDICT_TOOLS;
+            case RULES_INQUIRY -> RULES_TOOLS;
+            case CREATE_PLAYER -> CREATE_PLAYER_TOOLS;
             case CREATE_MATCH -> isAdmin ? CREATE_MATCH_TOOLS : NO_TOOLS;
             case UNKNOWN_ACTION, ATTACK -> NO_TOOLS;
         };

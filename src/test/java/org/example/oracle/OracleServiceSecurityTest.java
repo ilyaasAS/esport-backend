@@ -6,18 +6,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class OracleServiceSecurityTest {
 
     private OracleService oracleService;
+    private OracleTools oracleTools;
     @Mock
     private OracleIntentClassifier intentClassifier;
     @Mock
@@ -32,7 +37,8 @@ class OracleServiceSecurityTest {
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         ChatClient chatClient = mock(ChatClient.class);
         OracleIntentClassifier realIntentClassifier = new OracleIntentClassifier();
-        OracleDeterministicExecutor realExecutor = new OracleDeterministicExecutor(mock(OracleTools.class));
+        oracleTools = mock(OracleTools.class);
+        OracleDeterministicExecutor realExecutor = new OracleDeterministicExecutor(oracleTools);
 
         when(builder.build()).thenReturn(chatClient);
         when(intentClassifier.classifyIntent(anyString(), anyBoolean()))
@@ -45,23 +51,29 @@ class OracleServiceSecurityTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(responseSanitizer.sanitizeTone(anyString()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(deterministicExecutor.execute(any(), anyString(), anyBoolean()))
-                .thenAnswer(invocation -> realExecutor.execute(
-                        invocation.getArgument(0),
-                        invocation.getArgument(1),
-                        invocation.getArgument(2)
-                ));
+
+        doAnswer(invocation -> {
+            OracleIntent intent = invocation.getArgument(0);
+            if (intent == null) {
+                return null;
+            }
+            return realExecutor.execute(
+                    intent,
+                    invocation.getArgument(1),
+                    invocation.getArgument(2)
+            );
+        }).when(deterministicExecutor).execute(any(), any(), anyBoolean());
 
         oracleService = new OracleService(builder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor);
     }
 
     @Test
-    void greeting_for_user_exposes_read_only_capabilities() {
+    void greeting_for_user_exposes_read_and_register_capabilities() {
         String response = oracleService.streamChat("Salut", false).blockFirst();
 
         assertTrue(response != null && response.contains("Je suis l'Oracle"));
-        assertTrue(response.contains("uniquement lire les données"));
-        assertTrue(response.contains("je ne peux pas modifier la base"));
+        assertTrue(response.contains("inscrire de nouveaux joueurs"));
+        assertTrue(response.contains("seul un administrateur peut enregistrer des matchs"));
     }
 
     @Test
@@ -75,9 +87,19 @@ class OracleServiceSecurityTest {
     }
 
     @Test
-    void user_cannot_trigger_write_action_even_with_explicit_create_request() {
+    void user_is_authorized_to_create_player() {
         String response = oracleService
                 .streamChat("Créer un joueur Shadow niveau 12", false)
+                .blockFirst();
+
+        assertTrue(response != null && response.contains("a été intégré à la ligue"));
+        assertTrue(response.contains("Shadow"));
+    }
+
+    @Test
+    void user_cannot_create_match_which_is_strictly_reserved_for_admin() {
+        String response = oracleService
+                .streamChat("Enregistre un match entre Shadow et Viper 10 à 5", false)
                 .blockFirst();
 
         assertTrue(response != null && response.contains("Je n'ai pas l'autorité nécessaire"));
@@ -99,5 +121,28 @@ class OracleServiceSecurityTest {
 
         assertTrue(adminResponse != null && adminResponse.contains("Désolé, je ne peux pas suivre cette instruction"));
         assertTrue(userResponse != null && userResponse.contains("Désolé, je ne peux pas suivre cette instruction"));
+    }
+
+    @Test
+    void prediction_request_is_classified_as_predict_match_and_handled() {
+        when(oracleTools.predictMatchWinner(any())).thenReturn("[PRONOSTIC OFFICIEL] ShadowStrike est favori.");
+
+        String response = oracleService
+                .streamChat("Prédis le résultat d'un match entre ShadowStrike et Viper", false)
+                .blockFirst();
+
+        assertTrue(response != null && response.contains("[PRONOSTIC OFFICIEL]"));
+    }
+
+    @Test
+    void user_is_authorized_to_inquire_about_tournament_rules() {
+        when(oracleTools.queryTournamentRules(any())).thenReturn("Article 5 : En cas de déconnexion...");
+
+        String response = oracleService
+                .streamChat("Quelle est la règle en cas de déconnexion ?", false)
+                .blockFirst();
+
+        // Must not return unauthorized error
+        assertTrue(response == null || !response.contains("Je n'ai pas l'autorité nécessaire"));
     }
 }

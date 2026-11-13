@@ -9,6 +9,7 @@ public enum OracleIntent {
     CREATE_MATCH,
     PREDICT_MATCH,
     READ,
+    RULES_INQUIRY,
     SMALL_TALK,
     UNKNOWN_ACTION,
     ATTACK

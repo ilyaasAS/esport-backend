@@ -3,6 +3,7 @@ package org.example.services;
 import org.example.models.Player;
 import org.example.web.dto.ActionResponseDTO;
 import org.example.web.dto.MatchDTO;
+import org.example.web.dto.MatchPredictionDTO;
 import org.example.web.dto.PlayerDTO;
 import org.example.web.dto.TotalScoreDTO;
 
@@ -79,4 +80,13 @@ public interface LeagueService {
      * @return joueur correspondant
      */
     Player getPlayerByNickname(String nickname);
+
+    /**
+     * Calcule la prédiction de victoire entre deux joueurs selon l'algorithme déterministe.
+     *
+     * @param player1Id identifiant du joueur 1
+     * @param player2Id identifiant du joueur 2
+     * @return DTO contenant les probabilités respectives et le favori
+     */
+    MatchPredictionDTO predictMatch(int player1Id, int player2Id);
 }
