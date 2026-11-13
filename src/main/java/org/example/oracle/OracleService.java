@@ -1,16 +1,23 @@
 package org.example.oracle;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.example.exceptions.BusinessException;
 import org.example.oracle.agents.EsportAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.text.Normalizer;
 import java.time.Duration;
@@ -68,6 +75,7 @@ public class OracleService {
     private final OracleResponseSanitizer responseSanitizer;
     private final OracleDeterministicExecutor deterministicExecutor;
     private final List<EsportAgent> agents;
+    private final WebClient langGraphWebClient;
 
     /**
      * Constructeur historique conservé pour la rétrocompatibilité des tests unitaires existants.
@@ -79,18 +87,30 @@ public class OracleService {
             OracleResponseSanitizer responseSanitizer,
             OracleDeterministicExecutor deterministicExecutor
     ) {
-        this(chatClientBuilder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor, List.of());
+        this(chatClientBuilder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor, List.of(), "http://localhost:8001");
+    }
+
+    public OracleService(
+            ChatClient.Builder chatClientBuilder,
+            OracleIntentClassifier intentClassifier,
+            OraclePromptBuilder promptBuilder,
+            OracleResponseSanitizer responseSanitizer,
+            OracleDeterministicExecutor deterministicExecutor,
+            List<EsportAgent> agents
+    ) {
+        this(chatClientBuilder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor, agents, "http://localhost:8001");
     }
 
     /**
-     * Construit la façade Oracle avec ses composants spécialisés et son pool d'agents.
+     * Construit la façade Oracle avec ses composants spécialisés, son pool d'agents et le client LangGraph.
      *
      * @param chatClientBuilder     constructeur du client conversationnel de secours
      * @param intentClassifier      classifieur d'intentions Oracle
      * @param promptBuilder         constructeur de prompt système
      * @param responseSanitizer     assainisseur de contenu Oracle
      * @param deterministicExecutor exécuteur déterministe prioritaire
-     * @param agents                pool des sous-agents spécialisés (Multi-Agents)
+     * @param agents                pool des sous-agents spécialisés (Multi-Agents V1)
+     * @param agentServiceUrl       URL du microservice d'orchestration LangGraph (V2)
      */
     @Autowired
     public OracleService(
@@ -99,7 +119,21 @@ public class OracleService {
             OraclePromptBuilder promptBuilder,
             OracleResponseSanitizer responseSanitizer,
             OracleDeterministicExecutor deterministicExecutor,
-            @Autowired(required = false) List<EsportAgent> agents
+            @Autowired(required = false) List<EsportAgent> agents,
+            @Value("${ai.agent.service.url:http://localhost:8001}") String agentServiceUrl
+    ) {
+        this(chatClientBuilder, intentClassifier, promptBuilder, responseSanitizer, deterministicExecutor, agents,
+                WebClient.builder().baseUrl(agentServiceUrl != null && !agentServiceUrl.isBlank() ? agentServiceUrl : "http://localhost:8001").build());
+    }
+
+    public OracleService(
+            ChatClient.Builder chatClientBuilder,
+            OracleIntentClassifier intentClassifier,
+            OraclePromptBuilder promptBuilder,
+            OracleResponseSanitizer responseSanitizer,
+            OracleDeterministicExecutor deterministicExecutor,
+            List<EsportAgent> agents,
+            WebClient langGraphWebClient
     ) {
         this.chatClient = chatClientBuilder != null ? chatClientBuilder.build() : null;
         this.intentClassifier = intentClassifier;
@@ -107,6 +141,7 @@ public class OracleService {
         this.responseSanitizer = responseSanitizer;
         this.deterministicExecutor = deterministicExecutor;
         this.agents = agents != null ? agents : List.of();
+        this.langGraphWebClient = langGraphWebClient;
     }
 
     /**
@@ -173,28 +208,59 @@ public class OracleService {
 
     private Flux<String> prepareResponseFlux(OracleIntent intent, String userMessage, boolean isAdmin) {
         return Flux.defer(() -> {
+            // Fast-path déterministe immédiat (0 ms pour urgences, sécurité, règles strictes)
             String deterministicResult = deterministicExecutor.execute(intent, userMessage, isAdmin);
             if (deterministicResult != null) {
                 return Flux.fromIterable(List.of(deterministicResult));
             }
 
-            // Délégation multi-agents : sélection de l'agent spécialisé compétent
-            if (agents != null && !agents.isEmpty()) {
-                EsportAgent matchedAgent = agents.stream()
-                        .filter(agent -> agent.supports(intent))
-                        .findFirst()
-                        .orElse(null);
-                if (matchedAgent != null) {
-                    log.info("Délégation multi-agents : intention={} -> agent={}", intent, matchedAgent.getClass().getSimpleName());
-                    return matchedAgent.process(userMessage, intent, isAdmin);
-                }
-            }
-
-            // Chaîne de secours unifiée (fallback historique)
-            String[] tools = selectTools(intent, isAdmin);
-            String systemPrompt = promptBuilder.buildSystemPrompt(intent, isAdmin);
-            return callOracle(systemPrompt, userMessage, tools);
+            // Routage prioritaire vers l'orchestrateur LangGraph (V2)
+            return streamFromLangGraph(userMessage, isAdmin)
+                    .onErrorResume(Exception.class, ex -> {
+                        log.warn("Microservice LangGraph indisponible ou en erreur ({}). Bascule automatique vers le pool d'agents Spring AI locaux (V1 fallback).",
+                                ex.getMessage());
+                        return fallbackToJavaAgents(intent, userMessage, isAdmin)
+                                .subscribeOn(Schedulers.boundedElastic());
+                    });
         });
+    }
+
+    private Flux<String> streamFromLangGraph(String userMessage, boolean isAdmin) {
+        if (langGraphWebClient == null) {
+            return Flux.error(new IllegalStateException("WebClient LangGraph non initialisé"));
+        }
+        String role = isAdmin ? "ADMIN" : "USER";
+        log.info("Routage vers le microservice LangGraph (V2) pour rôle={}", role);
+
+        return langGraphWebClient.post()
+                .uri("/api/agents/chat/stream")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(new AgentStreamRequest(userMessage, role))
+                .retrieve()
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {})
+                .mapNotNull(ServerSentEvent::data)
+                .filter(chunk -> chunk != null && !chunk.isEmpty())
+                .timeout(ORACLE_STREAM_TIMEOUT);
+    }
+
+    private Flux<String> fallbackToJavaAgents(OracleIntent intent, String userMessage, boolean isAdmin) {
+        // Délégation multi-agents : sélection de l'agent spécialisé compétent (V1)
+        if (agents != null && !agents.isEmpty()) {
+            EsportAgent matchedAgent = agents.stream()
+                    .filter(agent -> agent.supports(intent))
+                    .findFirst()
+                    .orElse(null);
+            if (matchedAgent != null) {
+                log.info("Fallback multi-agents local : intention={} -> agent={}", intent, matchedAgent.getClass().getSimpleName());
+                return matchedAgent.process(userMessage, intent, isAdmin);
+            }
+        }
+
+        // Chaîne de secours unifiée (fallback historique)
+        String[] tools = selectTools(intent, isAdmin);
+        String systemPrompt = promptBuilder.buildSystemPrompt(intent, isAdmin);
+        return callOracle(systemPrompt, userMessage, tools);
     }
 
     private OracleIntent resolveIntent(String userMessage, boolean isAdmin) {
@@ -230,6 +296,9 @@ public class OracleService {
      * @return flux de contenu texte retourné progressivement par le modèle
      */
     private Flux<String> callOracle(String systemPrompt, String userMessage, String[] tools) {
+        if (chatClient == null) {
+            return Flux.just("L'Oracle n'a pas pu formuler de réponse.");
+        }
         if (tools.length > 0) {
             return Flux.defer(() -> {
                 // Pour les requêtes avec outils, exécute le cycle complet via call() :
@@ -306,5 +375,10 @@ public class OracleService {
         String raw = userMessage == null ? "" : userMessage.trim().toLowerCase(Locale.ROOT);
         return Normalizer.normalize(raw, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
     }
+
+    public record AgentStreamRequest(
+            @JsonProperty("message") String message,
+            @JsonProperty("user_role") String userRole
+    ) {}
 
 }
